@@ -1,0 +1,6 @@
+artifacts/
+cache/
+.env
+typechain/
+coverage/
+coverage.json
