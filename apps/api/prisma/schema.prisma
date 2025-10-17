@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String       @id @default(cuid())
+  email     String?      @unique
+  name      String?
+  groups    GroupMember[]
+  expenses  Expense[]    @relation("UserExpenses")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model Group {
+  id          String         @id @default(cuid())
+  name        String
+  inviteCode  String         @unique
+  members     GroupMember[]
+  expenses    Expense[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model GroupMember {
+  id          String       @id @default(cuid())
+  group       Group        @relation(fields: [groupId], references: [id])
+  groupId     String
+  user        User         @relation(fields: [userId], references: [id])
+  userId      String
+  role        String       @default("member")
+  allocations Allocation[]
+  createdAt   DateTime     @default(now())
+
+  @@unique([groupId, userId])
+}
+
+model Expense {
+  id          String    @id @default(cuid())
+  group       Group     @relation(fields: [groupId], references: [id])
+  groupId     String
+  createdBy   User?     @relation("UserExpenses", fields: [createdById], references: [id])
+  createdById String?
+  merchant    String
+  date        DateTime
+  currency    String
+  subtotal    Decimal    @default(0)
+  tax         Decimal    @default(0)
+  total       Decimal    @default(0)
+  items       Item[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Item {
+  id          String       @id @default(cuid())
+  expense     Expense      @relation(fields: [expenseId], references: [id])
+  expenseId   String
+  name        String
+  quantity    Int
+  price       Decimal      @default(0)
+  category    String
+  allocations Allocation[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Allocation {
+  id        String      @id @default(cuid())
+  item      Item        @relation(fields: [itemId], references: [id])
+  itemId    String
+  member    GroupMember @relation(fields: [memberId], references: [id])
+  memberId  String
+  amount    Decimal     @default(0)
+  createdAt DateTime    @default(now())
+
+  @@unique([itemId, memberId])
+}
