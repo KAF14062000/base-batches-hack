@@ -60,7 +60,7 @@ export default function ExpensePage() {
         if (selected && selected.has(member.id)) {
           const price = Number(item.price ?? 0);
           const qty = Number(item.quantity ?? 1);
-          const share = price * qty / (selected.size || 1);
+          const share = (price * qty) / (selected.size || 1);
           total += share;
         }
       });
@@ -264,7 +264,9 @@ export default function ExpensePage() {
               <td>
                 <div>
                   <strong>{item.name}</strong>
-                  <p style={{ margin: 0, color: "#64748b", fontSize: "0.9rem" }}>
+                  <p
+                    style={{ margin: 0, color: "#64748b", fontSize: "0.9rem" }}
+                  >
                     {item.quantity} × {Number(item.price).toFixed(2)} —{" "}
                     {item.category}
                   </p>

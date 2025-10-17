@@ -12,8 +12,13 @@ const categories = [
 ];
 
 export default function UploadPage() {
-  const { apiBase, currentUser, currentGroupId, setCurrentGroupId, refreshGroup } =
-    useApp();
+  const {
+    apiBase,
+    currentUser,
+    currentGroupId,
+    setCurrentGroupId,
+    refreshGroup,
+  } = useApp();
   const [selectedGroupId, setSelectedGroupId] = useState(currentGroupId ?? "");
   const [filePreview, setFilePreview] = useState(null);
   const [base64Image, setBase64Image] = useState(null);

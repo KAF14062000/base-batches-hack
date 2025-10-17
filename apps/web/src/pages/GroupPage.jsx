@@ -89,7 +89,9 @@ export default function GroupPage() {
 
           <section>
             <h3>Expenses</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+            >
               {expenses.length === 0 && (
                 <p style={{ color: "#64748b" }}>No expenses yet.</p>
               )}
@@ -123,7 +125,10 @@ export default function GroupPage() {
           <section>
             <h3>Invite</h3>
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              <button className="btn btn-secondary" onClick={() => handleInvite(false)}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => handleInvite(false)}
+              >
                 Copy invite link
               </button>
               <input
@@ -132,12 +137,17 @@ export default function GroupPage() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
-              <button className="btn btn-primary" onClick={() => handleInvite(true)}>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleInvite(true)}
+              >
                 Email invite
               </button>
             </div>
             {inviteLink && (
-              <p style={{ marginTop: "0.75rem", color: "#0b76ff" }}>{inviteLink}</p>
+              <p style={{ marginTop: "0.75rem", color: "#0b76ff" }}>
+                {inviteLink}
+              </p>
             )}
             {status && <p style={{ marginTop: "0.5rem" }}>{status}</p>}
           </section>

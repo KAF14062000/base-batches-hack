@@ -135,7 +135,13 @@ export default function DashboardPage() {
     <div className="card" style={{ display: "grid", gap: "2rem" }}>
       <h2>Dashboard</h2>
       <div style={{ display: "grid", gap: "1.5rem" }}>
-        <div style={{ display: "grid", gap: "1rem", gridTemplateColumns: "1fr 1fr" }}>
+        <div
+          style={{
+            display: "grid",
+            gap: "1rem",
+            gridTemplateColumns: "1fr 1fr",
+          }}
+        >
           <div className="card" style={{ padding: "1rem" }}>
             <strong>Total spent</strong>
             <p style={{ fontSize: "2rem", margin: 0 }}>

@@ -62,9 +62,7 @@ export default function AppShell({ children }) {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={({ isActive }) =>
-                    isActive ? "tag" : "nav-link"
-                  }
+                  className={({ isActive }) => (isActive ? "tag" : "nav-link")}
                   style={({ isActive }) => ({
                     fontWeight: 600,
                     color: isActive ? "#0b76ff" : "#475569",

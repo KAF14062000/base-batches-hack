@@ -67,7 +67,9 @@ function toDecimal(value) {
 }
 
 function decimalToNumber(decimal) {
-  return Number(decimal instanceof Prisma.Decimal ? decimal.toString() : decimal);
+  return Number(
+    decimal instanceof Prisma.Decimal ? decimal.toString() : decimal,
+  );
 }
 
 function makeInviteCode() {
@@ -157,10 +159,12 @@ async function buildUserAllocations({ userId, from, to }) {
   });
 
   return {
-    totalsByMonth: Array.from(totalsByMonth.entries()).map(([month, value]) => ({
-      month,
-      total: decimalToNumber(value),
-    })),
+    totalsByMonth: Array.from(totalsByMonth.entries()).map(
+      ([month, value]) => ({
+        month,
+        total: decimalToNumber(value),
+      }),
+    ),
     totalsByCategory: Array.from(totalsByCategory.entries()).map(
       ([category, value]) => ({
         category,
@@ -184,7 +188,9 @@ app.post("/ocr", upload.single("file"), async (req, res, next) => {
       null;
 
     if (!base64Image) {
-      return res.status(400).json({ error: "image file or base64 is required" });
+      return res
+        .status(400)
+        .json({ error: "image file or base64 is required" });
     }
 
     const prompt = await loadPrompt("ocr.md");
@@ -212,7 +218,15 @@ app.post("/ocr", upload.single("file"), async (req, res, next) => {
         tax: { type: "number" },
         total: { type: "number" },
       },
-      required: ["merchant", "date", "currency", "items", "subtotal", "tax", "total"],
+      required: [
+        "merchant",
+        "date",
+        "currency",
+        "items",
+        "subtotal",
+        "tax",
+        "total",
+      ],
       additionalProperties: false,
     };
 
@@ -358,7 +372,10 @@ app.patch("/expenses/:id", async (req, res, next) => {
 
     res.json(updated);
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
       return res.status(404).json({ error: "Expense not found" });
     }
     next(error);
@@ -478,9 +495,7 @@ app.post("/groups/:id/invite", async (req, res, next) => {
     const link = `${baseUrl}/group/${group.id}?invite=${group.inviteCode}`;
 
     const hasSmtp =
-      process.env.SMTP_HOST &&
-      process.env.SMTP_USER &&
-      process.env.SMTP_PASS;
+      process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS;
 
     if (hasSmtp && payload.email) {
       const transporter = nodemailer.createTransport({
@@ -610,7 +625,11 @@ app.get("/users/:id/insights", async (req, res, next) => {
     previousFrom.setDate(currentFrom.getDate() - 30);
 
     const [current, previous] = await Promise.all([
-      buildUserAllocations({ userId: req.params.id, from: currentFrom, to: now }),
+      buildUserAllocations({
+        userId: req.params.id,
+        from: currentFrom,
+        to: now,
+      }),
       buildUserAllocations({
         userId: req.params.id,
         from: previousFrom,
