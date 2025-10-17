@@ -1,306 +1,203 @@
-# base-batches-hack
+# SplitBase (Base Batches Starter)
 
-**SplitBase** — a beginner-friendly onchain app for the Base Batches hackathon.
-Upload/enter a bill → create a “split” → friends settle with one tap on **Base Sepolia (testnet)** → verify on **Basescan**.
+Upload a receipt → AI parses the bill → split items across your group → settle on-chain on Base Sepolia (testnet) → verify on Basescan.
 
-> This starter is intentionally minimal so a new team can ship in days, not weeks. You can layer on Basenames, Base Account (passkeys + sponsored tx), and Mini Apps later.
-
----
-
-## ✨ What’s included
-
-- **`contracts/`** — Hardhat project with a tiny `GroupSplit.sol` contract + deploy script
-- **`apps/api/`** — Express + Prisma + SQLite service for OCR, allocations, invitations, and insights
-- **`apps/web/`** — Vite + React (+ ethers v6) web app to call the contract and new API (upload → allocate → settle)
+This is a minimal, hackathon-friendly monorepo with a contract, an API, and a React web app.
 
 ---
 
-## 📌 Demo Links (fill these before submission)
+## What’s Inside
 
-- **Live App:** `https://<your-vercel-or-netlify-url>`
-- **Contract (Base Sepolia):** `0x...`
-- **Basescan:** deployment `https://sepolia.basescan.org/address/0x...`
-- **Sample Tx:** `https://sepolia.basescan.org/tx/0x...`
-- **Video (≥ 1 min):** `https://…`
+- `contracts/` — Hardhat project with `GroupSplit.sol` and a deploy script
+- `apps/api/` — Express + Prisma + SQLite service (OCR, groups, expenses, allocations, insights, deals)
+- `apps/web/` — Vite + React (+ ethers v6 + chart.js) frontend (upload → allocate → settle)
 
 ---
 
-## 🧠 What you’ll learn (mini-glossary)
-
-- **Base Sepolia:** a free test network—perfect for demos
-- **Wallet:** your onchain account in the browser (MetaMask, Coinbase Wallet)
-- **RPC:** endpoint used to send transactions to the network
-- **Contract ABI:** JSON that describes a contract’s functions/events (used by the frontend)
-- **Events:** onchain logs that make demos verifiable on Basescan
-
----
-
-## 🏗️ Architecture (high level)
-
-```
-Browser (Vite + React + ethers)
-   └── Connect wallet → switch/add Base Sepolia
-   └── Call contract methods (createSplit / settle)
-
-Smart Contract (GroupSplit.sol on Base Sepolia)
-   ├── createSplit(memo, people[], shares[]) -> emits SplitCreated
-   └── settle(id, to) payable -> transfer ETH + emits Settled
-
-Basescan (Explorer)
-   └── Shows deployment, transactions, and emitted events for judges to verify
-```
-
----
-
-## 📁 Repo Layout
+## Repo Layout
 
 ```
 base-batches-hack/
 ├─ README.md
 ├─ LICENSE
-├─ .gitignore
-├─ contracts/                # Hardhat
+├─ env.example
+├─ scripts/
+│  ├─ setup.sh
+│  └─ start.sh
+├─ contracts/
 │  ├─ contracts/GroupSplit.sol
 │  ├─ scripts/deploy.js
 │  ├─ hardhat.config.js
 │  ├─ package.json
 │  └─ .env.example
 └─ apps/
-   ├─ api/                   # Express + Prisma + Ollama Cloud client
-   │  ├─ src/index.js        # routes: OCR, groups, expenses, insights, deals
-   │  ├─ src/llm.js          # qwen3-vl wrapper with streaming option
-   │  ├─ src/prompts/*.md    # shared prompts for OCR, categorisation, insights
+   ├─ api/
+   │  ├─ src/index.js
+   │  ├─ src/llm.js
+   │  ├─ src/prompts/{ocr,categorize,insights}.md
    │  ├─ prisma/schema.prisma
-   │  └─ package.json
-   └─ web/                   # Vite + React + ethers + react-chartjs-2
+   │  ├─ package.json
+   │  └─ .env.example
+   └─ web/
       ├─ index.html
       ├─ vite.config.js
       ├─ package.json
       └─ src/
          ├─ App.jsx
-         ├─ main.jsx
          ├─ state/AppContext.jsx
-         ├─ pages/*
          ├─ components/AppShell.jsx
-         ├─ config.js        # put your contract address here
-         └─ abi/GroupSplit.json
+         ├─ pages/{Upload,Group,Expense,Dashboard,Deals}Page.jsx
+         ├─ abi/GroupSplit.json
+         └─ config.js
 ```
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
-### 0) Prereqs
+- Prereqs: Node 20+, Git, a browser wallet (MetaMask/Coinbase Wallet), Base Sepolia test ETH
 
-- Node.js **20+**, Git
-- Browser wallet (MetaMask or Coinbase Wallet)
-- **Free** test ETH on **Base Sepolia (chainId 84532)** — grab from any faucet
+1) One-time setup from repo root
 
-### 1) Deploy the contract (Base Sepolia)
+```
+npm run setup
+```
 
-```bash
+This seeds `apps/api/.env` if missing, installs workspace deps, and prepares Prisma (SQLite).
+
+2) Start API + Web together (dev)
+
+```
+npm start
+```
+
+By default, the API listens on `http://localhost:4000` and the web app on `http://localhost:5173`.
+
+3) Configure the contract address for the web app
+
+- Set the deployed address in `apps/web/src/config.js`:
+  - `export const CONTRACT_ADDRESS = "0xYOUR_CONTRACT";`
+
+---
+
+## Environment
+
+- Root (optional): copy `env.example` → `.env` for shared values like Ollama
+- API: copy `apps/api/.env.example` → `apps/api/.env`
+
+Required keys
+
+- `apps/api/.env`:
+  - `DATABASE_URL=file:./prisma/dev.sqlite`
+  - `PORT=4000`
+  - `APP_BASE_URL=http://localhost:5173`
+  - `OLLAMA_API_KEY=<your_ollama_token>`
+  - `OLLAMA_API_BASE=https://ollama.com/api`
+  - `SMTP_*` (optional for email invites)
+
+Web configuration
+
+- The web app reads `VITE_API_BASE_URL` (optional). Defaults to `http://localhost:4000` for local dev.
+
+---
+
+## Contracts (Base Sepolia)
+
+1) Deploy
+
+```
 cd contracts
 cp .env.example .env
-# Put your TEST private key (hex) into .env (DEPLOYER_KEY)
 npm install
 npm run build
 npm run deploy:base-sepolia
 ```
 
-Copy the printed **contract address** and keep it handy.
+- Put your test private key in `contracts/.env` (`DEPLOYER_KEY`), and RPC in `RPC_URL`.
+- Copy the printed contract address and paste it into `apps/web/src/config.js`.
 
-### 2) Boot the AI API (OCR, insights, deals)
+2) What the contract does
 
-```bash
-cd ../apps/api
-npm install
-cp .env.example .env
-# Fill in OLLAMA_API_KEY (cloud token) + optional SMTP creds
-npx prisma migrate dev --name init
-npm run dev
-```
+- `createSplit(memo, people[], shares[])` → emits `SplitCreated`
+- `settle(id, to)` (payable) → transfers ETH and emits `Settled`
 
-This launches the Express server on `http://localhost:4000` with Prisma + SQLite.
-
-### 3) Run the web app locally
-
-```bash
-cd ../web
-# or from repo root run: npm --workspace apps/web install
-npm install
-# Set the contract address in src/config.js:
-# export const CONTRACT_ADDRESS = "0xYOUR_DEPLOYED_ADDRESS";
-npm run dev
-```
-
-Open the shown URL → **Connect Wallet** → if needed, click **Switch to Base Sepolia**.
-Now test:
-
-- **Upload** — send a receipt to `/ocr`, review editable table, save to `/expenses`
-- **Allocate** — visit `/expense/:id`, assign members per line, persist allocations
-- **Settle** — keep Base Sepolia wallet connected and click **Settle on Base** to call the contract
-
-> Tip: from the repo root you can run `npm run dev` to start the API and web workspaces together.
-
-### 4) Verify on Basescan
-
-After each tx, click the tx hash in your wallet to open it on **Basescan**.
-Add those links to this README under **Demo Links** before you submit.
+Source: contracts/contracts/GroupSplit.sol
 
 ---
 
-## 🧠 AI Flows (Ollama Cloud)
+## API (Express + Prisma)
 
-- Add your Ollama Cloud token to `apps/api/.env` (`OLLAMA_API_KEY`) and point `OLLAMA_API_BASE` to `https://ollama.com/api` (default).
-- The API wraps qwen3-vl (`apps/api/src/llm.js`) for OCR, classification, reasoning, and copywriting through `/ocr`, `/users/:id/insights`, and unpublished helpers.
-- OCR prompts live in `apps/api/src/prompts/*.md` so you can iterate quickly without redeploying.
-- All structured responses use JSON schema via the `format` field so the web app receives strict JSON.
+- Start in dev (from repo root): `npm start` or `npm run dev`
+- Schema: apps/api/prisma/schema.prisma
+- Prompts: apps/api/src/prompts
 
-Endpoints snapshot:
+Endpoints
 
-- `POST /ocr` — upload base64 or multipart receipts, receive normalized JSON line items.
-- `POST /expenses` — persist expenses + items (optionally provide on-chain split id).
-- `POST /expenses/:id/allocate` — record member ↔ item selections, recompute owed totals.
-- `GET /users/:id/dashboard` — aggregated totals for charts, consumed by `/dashboard` route.
-- `GET /users/:id/insights` — qwen3-vl summary + savings tips for the last 30 days vs prior.
-- `GET /deals` — return curated deals filtered by recent categories.
+- `GET /health` — health check
+- `POST /ocr` — base64 or multipart image → normalized receipt JSON
+- `POST /expenses` — create expense with items
+- `GET /expenses/:id` — fetch expense + items + group
+- `PATCH /expenses/:id` — update expense (e.g., `splitId`)
+- `POST /expenses/:id/allocate` — save item allocations per group member
+- `GET /groups/:id` — group with members and recent expenses
+- `POST /groups` — create group (optional members)
+- `POST /groups/:id/invite` — create invite (optionally emails via SMTP)
+- `GET /users/:id/dashboard` — aggregates for charts
+- `GET /users/:id/insights` — 30-day summary + tips (qwen3-vl)
+- `GET /deals` — curated deals, filtered by recent categories
 
-Run `npm run dev` at the repo root to stream both API + web changes during development.
-
----
-
-## 🧪 What the contract does (simple)
-
-```solidity
-// create a split and emit an event judges can see
-function createSplit(string memo, address[] people, uint256[] shares) returns (uint256 id)
-
-// send ETH to a recipient and emit a Settled event
-function settle(uint256 id, address to) payable
-```
-
-**Events**
-
-- `SplitCreated(id, creator, memo, people, shares)`
-- `Settled(id, payer, to, amount)`
-
-This “events-first” design makes your demo easy to verify.
-
----
-
-## 🌐 Deploy the web app (for judges)
-
-### Vercel (quickest)
-
-- In the Vercel dashboard → **Add New Project** → Import `apps/web` folder from your GitHub repo
-- Build command: default (`vite`)
-- Make sure `src/config.js` has your contract address
-- Deploy → paste the live URL in **Demo Links**
-
-### Netlify (alternative)
-
-- New site from Git → pick `apps/web`
-- Build: `npm run build`, Publish directory: `dist/`
-
----
-
-## 🎥 Video script (90–120 seconds)
-
-1. **Intro** — “SplitBase: split and settle bills on Base testnet.”
-2. **Demo** — connect → create split → settle → open Basescan links.
-3. **Problem** — group bill splits are awkward and slow.
-4. **Solution** — one-tap settlement with onchain proof.
-5. **Architecture** — React + ethers + `GroupSplit` on Base Sepolia.
-
-Record your screen + voice; keep it punchy.
-
----
-
-## ✅ Submission Checklist
-
-- Public **live app URL**
-- **Open-source** repository (this project)
-- **Video** (≥ 1 min) covering Intro → Demo → Problem → Solution → Architecture
-- **Proof on Base Sepolia**: deployment + ≥1 test transaction (Basescan links in README)
-- (Nice-to-have) Call out support or plans for **Basenames** / **Base Account (passkeys, sponsored tx)**
-
----
-
-## 🧩 Configuration Details
-
-### contracts/.env
+Quick check
 
 ```
-DEPLOYER_KEY=your_test_private_key_hex_here
-RPC_URL=https://sepolia.base.org
-BASESCAN_API_KEY=optional_if_you_want_verify
+curl -s http://localhost:4000/health
 ```
 
-### apps/web/src/config.js
+Notes
 
-```js
-export const CONTRACT_ADDRESS = "0x..."; // paste from your deployment
-export const CHAIN_ID = 84532; // Base Sepolia
-export const RPC_URL = "https://sepolia.base.org"; // used for reads if needed
-```
+- The API uses the official `ollama` SDK directly in apps/api/src/index.js. A reusable helper also exists in apps/api/src/llm.js.
 
 ---
 
-## 🛠️ Local GitHub publish (optional helper)
+## Web (Vite + React)
 
-```bash
-# From repo root
-git init -b main
-git add .
-git commit -m "chore: initial commit (Base Batches starter)"
-gh repo create base-batches-hack --public --source=. --remote=origin --push
-```
+- Dev server: `npm --workspace apps/web run dev`
+- API base: `VITE_API_BASE_URL` (optional; default `http://localhost:4000`)
+- Contract address: apps/web/src/config.js
 
----
+User flows
 
-## 🧱 Learn by doing (short study plan)
+- Upload: `/upload` → send image to `/ocr`, edit, save to `/expenses`
+- Group: `/group/:groupId` → members, expenses, invites
+- Expense: `/expense/:expenseId` → allocate items per member, save, settle
+- Dashboard: `/dashboard` → charts via `/users/:id/dashboard`
+- Deals: `/deals` → curated offers by recent categories
 
-- **Day 1:** Deploy the contract; read your deployment on Basescan
-- **Day 2:** Wire the frontend; create a split; check the `SplitCreated` event
-- **Day 3:** Run 5–10 tiny `settle` payments among team wallets; collect links
-- **Day 4:** Deploy the web app; fix copy; shoot the demo video
-- **Day 5+:** Optional upgrades (below)
+On-chain settlement
+
+- Requires a browser wallet and Base Sepolia test ETH. The UI calls `settle(id, to)` on the configured contract address with an ETH value.
 
 ---
 
-## 🔭 Extension Ideas (post-MVP)
+## Demo Links (fill before submission)
 
-- **Basenames:** allow `name.base` in the “people/recipient” field (resolve to addresses)
-- **Base Account:** passkey sign-in + **sponsored tx** for gasless UX
-- **OCR:** parse bill images to prefill people/shares (e.g., Tesseract.js)
-- **Mini App:** package a lightweight mini app for distribution
-
----
-
-## 🧰 Troubleshooting
-
-- **No wallet detected** → install MetaMask or Coinbase Wallet
-- **Wrong network** → click “Switch to Base Sepolia” in the app
-- **Insufficient funds** → get more Base Sepolia test ETH; keep amounts tiny (0.0005–0.002)
-- **Contract call fails** → confirm `CONTRACT_ADDRESS` and that you deployed this exact `GroupSplit.sol`
-- **Array mismatch** → `people.length` must equal `shares.length`
+- Live App: https://<your-url>
+- Contract (Base Sepolia): 0x...
+- Basescan: https://sepolia.basescan.org/address/0x...
+- Sample Tx: https://sepolia.basescan.org/tx/0x...
+- Video (≥ 1 min): https://...
 
 ---
 
-## 🔒 Security & Hygiene
+## Troubleshooting
 
-- Use **test** keys only; never real/mainnet secrets
-- `.env` is git-ignored; don’t commit it
-- If you ever commit a secret, **rotate it immediately**
-
----
-
-## 📜 License
-
-MIT — see `LICENSE`.
+- Wallet/network: use MetaMask/Coinbase Wallet and switch to Base Sepolia (84532)
+- Missing env: ensure `apps/api/.env` exists (see example)
+- Prisma: rerun `npm run setup` or `npm --workspace apps/api exec prisma db push`
+- Contract calls: confirm `apps/web/src/config.js` has the deployed address
 
 ---
 
-### Credits
+## License
 
-Built as a learning-friendly starter to help new teams ship a working Base demo fast.
+MIT — see LICENSE
+
