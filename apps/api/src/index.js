@@ -237,6 +237,7 @@ app.post("/ocr", upload.single("file"), async (req, res, next) => {
 const expenseSchema = z.object({
   groupId: z.string(),
   createdById: z.string().optional(),
+  splitId: z.string().optional(),
   merchant: z.string().min(1),
   date: z
     .string()
@@ -266,6 +267,7 @@ app.post("/expenses", async (req, res, next) => {
       data: {
         groupId: payload.groupId,
         createdById: payload.createdById ?? null,
+        splitId: payload.splitId ?? null,
         merchant: payload.merchant,
         date: payload.date,
         currency: payload.currency,
@@ -292,6 +294,77 @@ app.post("/expenses", async (req, res, next) => {
   }
 });
 
+app.get("/expenses/:id", async (req, res, next) => {
+  try {
+    const expense = await prisma.expense.findUnique({
+      where: { id: req.params.id },
+      include: {
+        group: {
+          include: {
+            members: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+        items: {
+          include: {
+            allocations: true,
+          },
+        },
+      },
+    });
+
+    if (!expense) {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+
+    res.json(expense);
+  } catch (error) {
+    next(error);
+  }
+});
+
+const expenseUpdateSchema = z.object({
+  splitId: z.string().optional(),
+});
+
+app.patch("/expenses/:id", async (req, res, next) => {
+  try {
+    const payload = expenseUpdateSchema.parse(req.body ?? {});
+    const updated = await prisma.expense.update({
+      where: { id: req.params.id },
+      data: {
+        splitId: payload.splitId ?? null,
+      },
+      include: {
+        group: {
+          include: {
+            members: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+        items: {
+          include: {
+            allocations: true,
+          },
+        },
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return res.status(404).json({ error: "Expense not found" });
+    }
+    next(error);
+  }
+});
+
 const groupSchema = z.object({
   name: z.string().min(1),
   members: z
@@ -301,6 +374,7 @@ const groupSchema = z.object({
         email: z.string().email().optional(),
         name: z.string().optional(),
         role: z.string().optional(),
+        walletAddress: z.string().optional(),
       }),
     )
     .optional(),
@@ -327,6 +401,7 @@ app.post("/groups", async (req, res, next) => {
               groupId: group.id,
               userId: user.id,
               role: member.role ?? "member",
+              walletAddress: member.walletAddress ?? null,
             },
           });
         }),
@@ -484,6 +559,15 @@ app.post("/expenses/:id/allocate", async (req, res, next) => {
     const updated = await prisma.expense.findUnique({
       where: { id: req.params.id },
       include: {
+        group: {
+          include: {
+            members: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
         items: {
           include: {
             allocations: true,

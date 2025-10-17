@@ -34,6 +34,7 @@ model GroupMember {
   user        User         @relation(fields: [userId], references: [id])
   userId      String
   role        String       @default("member")
+  walletAddress String?
   allocations Allocation[]
   createdAt   DateTime     @default(now())
 
@@ -46,6 +47,7 @@ model Expense {
   groupId     String
   createdBy   User?     @relation("UserExpenses", fields: [createdById], references: [id])
   createdById String?
+  splitId     String?
   merchant    String
   date        DateTime
   currency    String
