@@ -21,8 +21,6 @@ const ollama = new Ollama({
   }
 })
 
-console.log(process.env.OLLAMA_API_KEY)
-
 const prisma = new PrismaClient();
 const app = express();
 
@@ -34,6 +32,39 @@ const upload = multer({
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Helper: redacts large strings and sensitive keys
+function safeReplacer(key, value) {
+  const k = String(key || "").toLowerCase();
+  const sensitive = ["password", "pass", "token", "authorization", "api_key", "image", "base64"];
+  if (sensitive.includes(k)) return "[redacted]";
+  if (typeof value === "string" && value.length > 200) return `[omitted ${value.length} chars]`;
+  if (Buffer.isBuffer?.(value)) return `[buffer ${value.length} bytes]`;
+  return value;
+}
+
+// Minimal request logging (method, path, status, duration)
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
+    const baseMsg = `[api] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms}ms`;
+    if (level === "info") return console.log(baseMsg);
+    // On errors, include a compact, redacted snapshot of the request
+    let bodySummary = "";
+    try {
+      const serialized = JSON.stringify(req.body ?? {}, safeReplacer);
+      if (serialized && serialized !== "{}") bodySummary = ` body=${serialized}`;
+    } catch {}
+    const errMsg = res.locals?.error?.message ? ` error=${JSON.stringify(res.locals.error.message)}` : "";
+    const line = `${baseMsg}${errMsg}${bodySummary}`;
+    return level === "error" ? console.error(line) : console.warn(line);
+  });
+  next();
+});
+
+// (note) duplicate basic logger removed; enhanced logger above handles all cases
 
 const promptsDir = path.resolve(process.cwd(), "src/prompts");
 const promptCache = new Map();
@@ -115,6 +146,51 @@ async function ensureUser({ userId, email, name }) {
       name,
     },
   });
+}
+
+async function ensureGroup({ groupId, name, createdById, role = "member", walletAddress = null }) {
+  let group = null;
+  if (groupId) {
+    group = await prisma.group.findUnique({ where: { id: groupId } });
+    if (!group) {
+      group = await prisma.group.create({
+        data: {
+          id: groupId,
+          name: name ?? "Untitled Group",
+          inviteCode: makeInviteCode(),
+        },
+      });
+      console.log(`[api] ensureGroup: created group ${groupId}`);
+    }
+  } else {
+    group = await prisma.group.create({
+      data: {
+        name: name ?? "Untitled Group",
+        inviteCode: makeInviteCode(),
+      },
+    });
+    console.log(`[api] ensureGroup: created group ${group.id}`);
+  }
+
+  if (createdById) {
+    const user = await ensureUser({ userId: createdById });
+    try {
+      await prisma.groupMember.upsert({
+        where: { groupId_userId: { groupId: group.id, userId: user.id } },
+        update: {},
+        create: {
+          groupId: group.id,
+          userId: user.id,
+          role,
+          walletAddress,
+        },
+      });
+    } catch (e) {
+      // ignore membership race conditions
+    }
+  }
+
+  return group;
 }
 
 async function buildUserAllocations({ userId, from, to }) {
@@ -293,6 +369,13 @@ const expenseSchema = z.object({
 app.post("/expenses", async (req, res, next) => {
   try {
     const payload = expenseSchema.parse(req.body);
+
+    // Ensure the group (and creator membership) exists; create if missing
+    await ensureGroup({
+      groupId: payload.groupId,
+      name: "Untitled Group",
+      createdById: payload.createdById,
+    });
 
     const created = await prisma.expense.create({
       data: {
@@ -763,11 +846,27 @@ app.get("/deals", (req, res) => {
   res.json(filtered.length ? filtered : deals.slice(0, 8));
 });
 
-app.use((err, _req, res, _next) => {
-  console.error(err);
-  res
-    .status(err.status || 500)
-    .json({ error: err.message || "Unexpected server error" });
+// JSON 404 for unknown routes (helps clients surface clear errors)
+app.use((req, res) => {
+  res.status(404).json({ error: "Not found", path: req.originalUrl });
+});
+
+app.use((err, req, res, _next) => {
+  const status = err.status || 500;
+  // Attach to res for the finish-logger above
+  res.locals.error = err;
+  // Structured error log with redacted request summary
+  let body = "";
+  try {
+    const serialized = JSON.stringify(req.body ?? {}, safeReplacer);
+    if (serialized && serialized !== "{}") body = ` body=${serialized}`;
+  } catch {}
+  const line = `[api] ERROR ${req.method} ${req.originalUrl} -> ${status} message=${JSON.stringify(
+    err.message || ""
+  )}${body}`;
+  console.error(line);
+  if (err.stack) console.error(err.stack);
+  res.status(status).json({ error: err.message || "Unexpected server error" });
 });
 
 const port = Number(process.env.PORT || 4000);

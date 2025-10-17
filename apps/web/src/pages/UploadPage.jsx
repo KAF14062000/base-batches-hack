@@ -136,7 +136,13 @@ export default function UploadPage() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        throw new Error("Failed to save expense");
+        const text = await response.text();
+        try {
+          const err = JSON.parse(text);
+          throw new Error(err?.error || text || "Failed to save expense");
+        } catch {
+          throw new Error(text || "Failed to save expense");
+        }
       }
       const expense = await response.json();
 
