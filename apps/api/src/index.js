@@ -8,7 +8,20 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { z } from "zod";
-import { chat } from "./llm.js";
+// import { chat } from "./llm.js";
+// import { writeFileSync } from "node:fs";
+import { Ollama } from "ollama";
+import { config } from "dotenv";
+config();
+
+const ollama = new Ollama({
+  host: "https://ollama.com",
+  headers: {
+    Authorization: `Bearer ${process.env.OLLAMA_API_KEY}`
+  }
+})
+
+console.log(process.env.OLLAMA_API_KEY)
 
 const prisma = new PrismaClient();
 const app = express();
@@ -240,7 +253,11 @@ app.post("/ocr", upload.single("file"), async (req, res, next) => {
       },
     ];
 
-    const response = await chat({ messages, schema });
+    const response = await ollama.chat({
+      model: "qwen3-vl:235b",
+      messages: messages, 
+      stream: false,
+    });
     const parsed = parseChatResponse(response);
     res.json(parsed);
   } catch (error) {
@@ -668,7 +685,12 @@ app.get("/users/:id/insights", async (req, res, next) => {
       },
     ];
 
-    const response = await chat({ messages, schema });
+    const response = await ollama.chat({ 
+      model: "qwen3-vl:235b",
+      messages: messages,
+      stream: false,
+    });
+
     const parsed = parseChatResponse(response);
     res.json({
       comparison: {
