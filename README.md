@@ -1,203 +1,87 @@
-# SplitBase (Base Batches Starter)
+## Base Splitwise — Edge-native group settles for Base Sepolia
 
-Upload a receipt → AI parses the bill → split items across your group → settle on-chain on Base Sepolia (testnet) → verify on Basescan.
+This repository contains a single Next.js (App Router) application that runs all server logic on the Edge runtime. The product flow:
 
-This is a minimal, hackathon-friendly monorepo with a contract, an API, and a React web app.
+- Upload a receipt and normalize the data using **Ollama Cloud** (`qwen3-vl:235b-cloud`).
+- Statlessly sign invite payloads with Web Crypto (HMAC-SHA256) and share lightweight links.
+- Let invitees self-select the items they consumed and compute per-member totals locally.
+- Settle outstanding balances on **Base Sepolia** through a minimal `GroupSplit` contract using **ethers v6**.
+- Surface monthly/category summaries, AI-generated insights, and static personalized deals from local history.
 
----
+### Tech summary
 
-## What’s Inside
+- Next.js 15 App Router · Edge route handlers (`runtime = 'edge'`).
+- TypeScript-first codebase with Tailwind CSS, shadcn/ui (Button/Input/Textarea/Card/Badge/Table/Tabs/Sheet/Dialog/Toast).
+- Local-only persistence via `localStorage`; invites are signed with `INVITE_SECRET` using Web Crypto.
+- No Node-only APIs in the Edge paths.
 
-- `contracts/` — Hardhat project with `GroupSplit.sol` and a deploy script
-- `apps/api/` — Express + Prisma + SQLite service (OCR, groups, expenses, allocations, insights, deals)
-- `apps/web/` — Vite + React (+ ethers v6 + chart.js) frontend (upload → allocate → settle)
+## Setup
 
----
+1. Install dependencies:
 
-## Repo Layout
+   ```bash
+   npm install
+   ```
 
-```
-base-batches-hack/
-├─ README.md
-├─ LICENSE
-├─ env.example
-├─ scripts/
-│  ├─ setup.sh
-│  └─ start.sh
-├─ contracts/
-│  ├─ contracts/GroupSplit.sol
-│  ├─ scripts/deploy.js
-│  ├─ hardhat.config.js
-│  ├─ package.json
-│  └─ .env.example
-└─ apps/
-   ├─ api/
-   │  ├─ src/index.js
-   │  ├─ src/llm.js
-   │  ├─ src/prompts/{ocr,categorize,insights}.md
-   │  ├─ prisma/schema.prisma
-   │  ├─ package.json
-   │  └─ .env.example
-   └─ web/
-      ├─ index.html
-      ├─ vite.config.js
-      ├─ package.json
-      └─ src/
-         ├─ App.jsx
-         ├─ state/AppContext.jsx
-         ├─ components/AppShell.jsx
-         ├─ pages/{Upload,Group,Expense,Dashboard,Deals}Page.jsx
-         ├─ abi/GroupSplit.json
-         └─ config.js
-```
+2. Copy environment variables:
 
----
+   ```bash
+   cp .env.local.example .env.local
+   ```
 
-## Quick Start
+   Populate the values:
 
-- Prereqs: Node 20+, Git, a browser wallet (MetaMask/Coinbase Wallet), Base Sepolia test ETH
+   - `NEXT_PUBLIC_CONTRACT_ADDRESS` — deployed `GroupSplit` contract on Base Sepolia.
+   - `OLLAMA_API_KEY` — Ollama Cloud API key (used by `/api/ocr` and `/api/insights`).
+   - `INVITE_SECRET` — random string for signing invite payloads (HMAC-SHA256).
 
-1) One-time setup from repo root
+   > If you previously stored credentials in `.env`, rename it to `.env.local`.
 
-```
-npm run setup
-```
+3. (Optional) Deploy the contract once locally using Hardhat:
 
-This seeds `apps/api/.env` if missing, installs workspace deps, and prepares Prisma (SQLite).
+   ```bash
+   cd contracts
+   npm install
+   npx hardhat compile
+   npx hardhat run scripts/deploy.ts --network baseSepolia
+   ```
 
-2) Start API + Web together (dev)
+   Copy the printed address into `NEXT_PUBLIC_CONTRACT_ADDRESS`.
 
-```
-npm start
-```
+4. Run the development server:
 
-By default, the API listens on `http://localhost:4000` and the web app on `http://localhost:5173`.
+   ```bash
+   npm run dev
+   ```
 
-3) Configure the contract address for the web app
+   Visit `http://localhost:3000` to access the landing page.
 
-- Set the deployed address in `apps/web/src/config.js`:
-  - `export const CONTRACT_ADDRESS = "0xYOUR_CONTRACT";`
+## Key routes
 
----
+- `/upload` — Upload receipt → OCR via Qwen3-VL → edit normalized data → create signed invite.
+- `/join` — Verify invite token → interactive item selection → per-member totals → save locally.
+- `/settle` — Connect wallet → ensure Base Sepolia → pay outstanding balances on-chain.
+- `/dashboard` — Monthly/category summaries, AI insights (`/api/insights`), static deals.
 
-## Environment
+API handlers (Edge runtime):
 
-- Root (optional): copy `env.example` → `.env` for shared values like Ollama
-- API: copy `apps/api/.env.example` → `apps/api/.env`
+- `POST /api/ocr` — Validates payload, calls Ollama Cloud, enforces `OCRDoc` schema.
+- `POST /api/invite/create` — Signs `{ group, expense }` with `INVITE_SECRET`, returns invite URL.
+- `GET /api/invite/verify` — Verifies and returns the invite snapshot.
+- `POST /api/insights` — Sends history to Qwen3-VL and validates strict `{ findings, tips }`.
 
-Required keys
+## Notes
 
-- `apps/api/.env`:
-  - `DATABASE_URL=file:./prisma/dev.sqlite`
-  - `PORT=4000`
-  - `APP_BASE_URL=http://localhost:5173`
-  - `OLLAMA_API_KEY=<your_ollama_token>`
-  - `OLLAMA_API_BASE=https://ollama.com/api`
-  - `SMTP_*` (optional for email invites)
+- Route handlers and invite signing rely on Web Crypto — no Node-specific APIs are used.
+- The invite token is a base64url-encoded payload + signature. Rotate `INVITE_SECRET` to invalidate outstanding tokens.
+- Local history lives in `localStorage`; removing browser data clears expenses.
+- `settle` calls interpret the share value as ETH. Adjust the amount field before sending if you need a conversion.
+- Tailwind + shadcn/ui components are wired through `components.json`; run `npx shadcn@latest add …` to extend.
 
-Web configuration
+## Scripts
 
-- The web app reads `VITE_API_BASE_URL` (optional). Defaults to `http://localhost:4000` for local dev.
+- `npm run dev` — start Next.js locally.
+- `npm run build` — production build (Edge).
+- `npm run lint` — lint with ESLint.
 
----
-
-## Contracts (Base Sepolia)
-
-1) Deploy
-
-```
-cd contracts
-cp .env.example .env
-npm install
-npm run build
-npm run deploy:base-sepolia
-```
-
-- Put your test private key in `contracts/.env` (`DEPLOYER_KEY`), and RPC in `RPC_URL`.
-- Copy the printed contract address and paste it into `apps/web/src/config.js`.
-
-2) What the contract does
-
-- `createSplit(memo, people[], shares[])` → emits `SplitCreated`
-- `settle(id, to)` (payable) → transfers ETH and emits `Settled`
-
-Source: contracts/contracts/GroupSplit.sol
-
----
-
-## API (Express + Prisma)
-
-- Start in dev (from repo root): `npm start` or `npm run dev`
-- Schema: apps/api/prisma/schema.prisma
-- Prompts: apps/api/src/prompts
-
-Endpoints
-
-- `GET /health` — health check
-- `POST /ocr` — base64 or multipart image → normalized receipt JSON
-- `POST /expenses` — create expense with items
-- `GET /expenses/:id` — fetch expense + items + group
-- `PATCH /expenses/:id` — update expense (e.g., `splitId`)
-- `POST /expenses/:id/allocate` — save item allocations per group member
-- `GET /groups/:id` — group with members and recent expenses
-- `POST /groups` — create group (optional members)
-- `POST /groups/:id/invite` — create invite (optionally emails via SMTP)
-- `GET /users/:id/dashboard` — aggregates for charts
-- `GET /users/:id/insights` — 30-day summary + tips (qwen3-vl)
-- `GET /deals` — curated deals, filtered by recent categories
-
-Quick check
-
-```
-curl -s http://localhost:4000/health
-```
-
-Notes
-
-- The API uses the official `ollama` SDK directly in apps/api/src/index.js. A reusable helper also exists in apps/api/src/llm.js.
-
----
-
-## Web (Vite + React)
-
-- Dev server: `npm --workspace apps/web run dev`
-- API base: `VITE_API_BASE_URL` (optional; default `http://localhost:4000`)
-- Contract address: apps/web/src/config.js
-
-User flows
-
-- Upload: `/upload` → send image to `/ocr`, edit, save to `/expenses`
-- Group: `/group/:groupId` → members, expenses, invites
-- Expense: `/expense/:expenseId` → allocate items per member, save, settle
-- Dashboard: `/dashboard` → charts via `/users/:id/dashboard`
-- Deals: `/deals` → curated offers by recent categories
-
-On-chain settlement
-
-- Requires a browser wallet and Base Sepolia test ETH. The UI calls `settle(id, to)` on the configured contract address with an ETH value.
-
----
-
-## Demo Links (fill before submission)
-
-- Live App: https://<your-url>
-- Contract (Base Sepolia): 0x...
-- Basescan: https://sepolia.basescan.org/address/0x...
-- Sample Tx: https://sepolia.basescan.org/tx/0x...
-- Video (≥ 1 min): https://...
-
----
-
-## Troubleshooting
-
-- Wallet/network: use MetaMask/Coinbase Wallet and switch to Base Sepolia (84532)
-- Missing env: ensure `apps/api/.env` exists (see example)
-- Prisma: rerun `npm run setup` or `npm --workspace apps/api exec prisma db push`
-- Contract calls: confirm `apps/web/src/config.js` has the deployed address
-
----
-
-## License
-
-MIT — see LICENSE
-
+Happy hacking on Base 🧾⚡️

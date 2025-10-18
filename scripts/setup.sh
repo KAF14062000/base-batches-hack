@@ -4,32 +4,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-API_ENV="$ROOT_DIR/apps/api/.env"
-API_ENV_EXAMPLE="$ROOT_DIR/apps/api/.env.example"
-
-if [[ ! -f "$API_ENV" ]]; then
-  if [[ -f "$API_ENV_EXAMPLE" ]]; then
-    cp "$API_ENV_EXAMPLE" "$API_ENV"
-    echo "[setup] Seeded apps/api/.env from example. Update secrets after setup."
-  else
-    echo "[setup] Error: missing apps/api/.env and no example template found."
-    exit 1
-  fi
-fi
-
-echo "[setup] Installing workspace dependencies"
+echo "➤ Installing Node dependencies"
 npm install
 
-echo "[setup] Pushing Prisma schema to SQLite"
-npm --workspace apps/api exec prisma db push
+if [[ -f ".env.local" ]]; then
+  echo "✓ .env.local already exists"
+elif [[ -f ".env.local.example" ]]; then
+  cp .env.local.example .env.local
+  echo "✓ Created .env.local from .env.local.example — update the values before running the app"
+else
+  echo "⚠️  Missing .env.local.example — create .env.local with OLLAMA_API_KEY, INVITE_SECRET, NEXT_PUBLIC_CONTRACT_ADDRESS" >&2
+fi
 
-echo "[setup] Generating Prisma client"
-npm --workspace apps/api exec prisma generate
-
-cat <<'EOM'
-
-[setup] Complete.
-Next steps:
-  1. Fill in environment variables: cp env.example .env && cp apps/api/.env.example apps/api/.env
-  2. Run `npm start` to launch API + web apps
-EOM
+echo "Setup complete. Next steps:"
+echo "  1. Fill in .env.local with your Ollama key, invite secret, and contract address."
+echo "  2. (Optional) Deploy contracts/GroupSplit.sol and update NEXT_PUBLIC_CONTRACT_ADDRESS."
