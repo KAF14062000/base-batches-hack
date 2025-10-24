@@ -9,19 +9,48 @@ export const preferredRegion = "auto"
 
 const requestSchema = z.object({
   imageBase64: z.string().min(1, "imageBase64 required"),
+  countryCode: z.string().optional(),
+  country: z.string().optional(),
 })
+
 
 const systemPrompt = `You are an OCR assistant that extracts structured data from receipt images.
 Return ONLY JSON that matches the provided schema with no extra keys.
+Here is the schema:
+
+{
+  "merchant": "string (non-empty)",
+  "date": "string (date ISO or raw text)",
+  "currency": "string (e.g. \"INR\", \"USD\")",
+  "items": [
+    {
+      "name": "string",
+      "qty": "number (optional)",
+      "price": "number (non-negative)",
+      "category": "one of [food, drinks, utilities, transport, entertainment, other]"
+    }
+  ],
+  "subtotal": "number (non-negative)",
+  "tax": "number (non-negative)",
+  "service_charge": "number (non-negative, if found)",
+  "sgst": "number (non-negative, if found)",
+  "cgst": "number (non-negative, if found)",
+  "discount": "number (non-negative, optional)",
+  "total": "number (non-negative)",
+  "notes": "string (optional)"
+}
+
 Rules:
-- merchant: string, title case.
-- date: ISO 8601 if possible, otherwise raw text.
-- currency: three letter code when obvious, otherwise symbol or text.
-- items: include every purchasable line item with category in {food, drinks, utilities, transport, entertainment, other}.
-- subtotal, tax, total: infer missing values when possible.
-Ensure numeric fields are numbers, not strings.`
+- Use title case for merchant.
+- Use ISO 8601 format for date if possible.
+- Use three-letter currency codes when obvious.
+- Numeric fields must be numbers (not strings).
+- Do not include any extra keys.
+`;
 
 export async function POST(request: Request) {
+
+
   let body: z.infer<typeof requestSchema>
   try {
     body = requestSchema.parse(await request.json())
@@ -34,8 +63,11 @@ export async function POST(request: Request) {
       { role: "system", content: systemPrompt },
       {
         role: "user",
-        content: "Extract the structured receipt data from this image. Respond with valid JSON only.",
-        images: [body.imageBase64],
+        content: `Extract the structured receipt data from this image.
+                  ${body.country != '' ? `We know the user is from ${body.country}.
+                  and their country code is ${body.countryCode}. In case the currecy is unclear from the
+                  image, use ${body.country}'s currency.` : ''} Respond with valid JSON only.`,
+        images: [body.imageBase64]
       },
     ])
     return NextResponse.json(result)

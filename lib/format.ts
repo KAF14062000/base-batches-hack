@@ -2,7 +2,7 @@ export function formatCurrency(amount: number, currency: string) {
   try {
     const formatter = new Intl.NumberFormat(undefined, {
       style: "currency",
-      currency: currency.length === 3 ? currency.toUpperCase() : "USD",
+      currency: currency.length === 3 ? currency.toUpperCase() : "INR",
       maximumFractionDigits: 2,
       minimumFractionDigits: 2,
     })

@@ -25,6 +25,7 @@ import {
   receiptCategorySchema,
 } from "@/lib/schemas"
 
+
 const categories = receiptCategorySchema.options
 
 type EditableItem = OCRDoc["items"][number] & { id?: string }
@@ -161,6 +162,42 @@ export default function UploadPage() {
   }, [receipt])
 
   const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    // Derive a browser-locale fallback (e.g., en-US -> US)
+    const parseLocaleRegion = (loc: string | undefined | null) => {
+      if (!loc) return null
+      const norm = loc.replace("_", "-")
+      const parts = norm.split("-")
+      if (parts.length >= 2) return parts[1]?.toUpperCase() || null
+      return null
+    }
+
+    let browserRegion = parseLocaleRegion(navigator.language)
+    if (!browserRegion && Array.isArray(navigator.languages) && navigator.languages.length > 0) {
+      browserRegion = parseLocaleRegion(navigator.languages[0])
+    }
+
+    // Try edge geolocation first, fallback to browser region
+    let countryCode = browserRegion || ""
+    let countryname = countryCode
+    if (!countryCode || !browserRegion){
+      console.log("Fallback to geolocation API for country code");
+
+      try {
+        const response = await fetch("/api/geolocation")
+        if (response.ok) {
+          const { country_code, country } = (await response.json()) as { country_code: string | null; country: string | null }
+          if (country_code) {
+            countryCode = country_code
+            countryname = country || country_code
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching geolocation:", error)
+      }
+
+    }
+
+
     const file = event.target.files?.[0]
     if (!file) return
     setUploading(true)
@@ -168,10 +205,10 @@ export default function UploadPage() {
     try {
       const base64 = await fileToBase64(file)
       setImagePreview(base64)
-      const response = await fetch("/api/ocr", {
+      const response = await fetch("/api/sequentialOCR", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64 }),
+        body: JSON.stringify({ imageBase64: base64, countryCode: countryCode, country: countryname }),
       })
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: "OCR failed" }))

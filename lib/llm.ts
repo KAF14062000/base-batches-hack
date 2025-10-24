@@ -23,6 +23,27 @@ function encodeImageContent(content: BaseMessage["content"], images: string[] | 
   ]
 }
 
+function cleanJsonText(raw: string) {
+  let text = raw.trim()
+  // Strip code fences if present
+  if (text.startsWith("```") && text.endsWith("```")) {
+    text = text.slice(3, -3).trim()
+    // Drop optional language hint like ```json
+    if (text.toLowerCase().startsWith("json")) {
+      text = text.slice(4).trim()
+    }
+  }
+  // If content contains prose, try to extract the first JSON object
+  if (!text.trim().startsWith("{") && text.includes("{")) {
+    const start = text.indexOf("{")
+    const end = text.lastIndexOf("}")
+    if (start !== -1 && end !== -1 && end > start) {
+      text = text.slice(start, end + 1)
+    }
+  }
+  return text
+}
+
 function decodeJsonMessage(message?: unknown) {
   if (!message || typeof message !== "object") {
     throw new Error("LLM response missing message payload")
@@ -30,12 +51,19 @@ function decodeJsonMessage(message?: unknown) {
 
   const content = (message as { content?: string }).content
   if (typeof content !== "string" || !content.trim()) {
+    console.log("----- Error log -----\n");
+    console.log("LLM response content: ", content);
+    console.log("----- END -----\n");
     throw new Error("LLM response did not include JSON content")
   }
 
   try {
-    return JSON.parse(content)
+    const cleaned = cleanJsonText(content)
+    return JSON.parse(cleaned)
   } catch {
+    console.log("----- LLM Error log -----\n");
+    console.log("LLM response content: ", content);
+    console.log("----- END -----\n");
     throw new Error("Failed to parse LLM JSON content")
   }
 }
@@ -61,6 +89,7 @@ export async function chatJSON<T>(
       content: encodeImageContent(message.content, message.images),
     })),
     response_format: { type: "json_object" },
+    temperature: 0,
   }
 
   const response = await fetch(OLLAMA_URL, {

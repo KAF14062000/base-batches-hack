@@ -27,6 +27,7 @@ const routes = [
 export function AppHeader() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  
 
   const NavLinks = ({ onNavigate }: { onNavigate?: () => void }) => (
     <nav className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-1">
@@ -57,6 +58,7 @@ export function AppHeader() {
         <div className="hidden sm:block">
           <NavLinks />
         </div>
+        
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="sm:hidden">
